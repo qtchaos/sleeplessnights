@@ -24,12 +24,10 @@ jobs:
           cache-read-only: false
 
       - name: Execute Gradle build
-        # This will run the 'build' task for the root project and all subprojects
         run: ./gradlew build
 
       - name: Extract branch name
         shell: bash
-        # Get a clean branch name for the artifact label
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
@@ -38,14 +36,30 @@ jobs:
           fi
         id: ref
 
-      - name: Upload artifacts
+      # Find the correct jars and move them to clean folders
+      - name: Stage Artifacts
+        run: |
+          mkdir -p staged/fabric staged/neoforge staged/forge
+          
+          # Find jars, excluding -dev and -sources, and copy them to staged folders
+          find fabric/build/libs -maxdepth 1 -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} staged/fabric/ \;
+          find neoforge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} staged/neoforge/ \;
+          find forge/build/libs -maxdepth 1 -name "*.jar" ! -name "*-dev.jar" ! -name "*-sources.jar" -exec cp {} staged/forge/ \;
+
+      - name: Upload Fabric Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sleeplessnights-artifacts-${{ steps.ref.outputs.branch }}
-          # We check the 'libs' folder inside the 'build' folder of each subproject
-          path: |
-            fabric/build/libs/*.jar
-            neoforge/build/libs/*.jar
-            forge/build/libs/*.jar
-            !**/*-sources.jar
-            !**/*-dev.jar
+          name: fabric-${{ steps.ref.outputs.branch }}
+          path: staged/fabric/*
+
+      - name: Upload NeoForge Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neoforge-${{ steps.ref.outputs.branch }}
+          path: staged/neoforge/*
+
+      - name: Upload Forge Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ steps.ref.outputs.branch }}
+          path: staged/forge/*
