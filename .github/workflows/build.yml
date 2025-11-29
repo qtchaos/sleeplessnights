@@ -1,0 +1,51 @@
+name: build-commit
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Execute Gradle build
+        # This will run the 'build' task for the root project and all subprojects
+        run: ./gradlew build
+
+      - name: Extract branch name
+        shell: bash
+        # Get a clean branch name for the artifact label
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          fi
+        id: ref
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sleeplessnights-artifacts-${{ steps.ref.outputs.branch }}
+          # We check the 'libs' folder inside the 'build' folder of each subproject
+          path: |
+            fabric/build/libs/*.jar
+            neoforge/build/libs/*.jar
+            forge/build/libs/*.jar
+            !**/*-sources.jar
+            !**/*-dev.jar
